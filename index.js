@@ -3,7 +3,7 @@ const { app, express } = require("./server");//on importe app et express depuis 
 const port = 3000;
 const bodyParser = require("body-parser"); //retourne un middleware
 const path = require("path"); // fournit des fonctions utiles pour interagir avec les chemins relatifs de fichiers//fixer pour avoir un chemin absolu
-const { upload } = require("./middleware/multer");
+
 
 // Connection à la database
 require("./mongo");
@@ -13,45 +13,45 @@ require("./mongo");
 // Connection à users de controllers:
 const { createUser, logUser } = require("./controllers/users");
 //const { getSauces, createSauce , putSauceById} = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
-const { getSauces, createSauce , getSauceById } = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
+const { getSauces, createSauce , getSauceById, deleteSauceById } = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
 console.log(getSauces, "get Sauces depuis Index!");
-// Pour Authentifier:
-const { authenticateUser } = require("./middleware/auth");
+
 
 //---------------------
 // MIDDLEWARE
 //---------------------
+// Pour Authentifier:
+const { authenticateUser } = require("./middleware/auth");
+// Pour télécharger l'image et la ranger dans le dossier image
+const { upload } = require("./middleware/multer");
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-//il faut preciser quel dossier on veut rendre accessible
-// ########## DOIT SE PLACER EN DESSOUS DE LA ROUTE EXPRESS.STATIC !!!!!!!!!!#########
-//express va servir un dossier static = assets qui ne bouge pas
 app.use("/images", express.static("images")); //rend le dossier accessible à tout public
 
 //--------------------------------
 // ROUTES
 //------------------------------
-//  Inscrire nouveau client:
+//  Inscrire un  nouveau client:
 app.post("/api/auth/signup", createUser); 
 
-// Connecter client connu:
+// Connecter un client déjà connu:
 app.post("/api/auth/login", logUser);
 
-//Récupérer sauces :
+// Récupérer et afficher toutes les sauces stockées dans la base de donnée :
 app.get("/api/sauces", authenticateUser, getSauces); //authenticateUser dans middleware/auth.js puis getSauces dans controllers/ sauces.js
 
-// Affiche et Met à jour sauce sauce spécifique sélectionnée:
+// Affiche la sauce spécifique sélectionnée:
 app.get("/api/sauces/:id", authenticateUser, getSauceById)// : devant id pour variable
 
-// Créer sauce :
-//upload est géré par le middleware dans le fichier index.js et createSauce s'execute dans sauce.js
-//multer va rajouter un .file et .body sur la requète. La requète passe d'un middleware à un autre
+// Poster une nouvelle sauce sur le site :
 app.post("/api/sauces", authenticateUser, upload, createSauce); //UPLOAD est déclaré en constante et require le chemin pour atteindre le fichier multer.js
 
+// Effacer une sauce spécifique via son identifiant : 
+app.delete("/api/sauces/:id", authenticateUser, deleteSauceById);// 
 
 
-// Afficher sauce : 
-app.get("/", (req, res) => res.send("hello world one"));
+// afficher reponse via port 3000 : 
+app.get("/", (req, res) => res.send("hello world on port 3000"));
 
 // listen
 console.log("-----------------------");

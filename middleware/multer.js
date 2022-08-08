@@ -1,15 +1,16 @@
 const multer = require("multer");
 
-//permat d'envoyer à la bonne destination le fichier image au bon format pou
+// Permet d'envoyer à la bonne destination le fichier image au bon format pou
 const storage = multer.diskStorage({
   destination: "images/",
-  filename: function (req, file, cb) {
-    cb(null, makeFilename(req, file)); //donc 1er argument req
+  filename: function (req, file, callback) {
+    callback(null, makeFilename(req, file)); //donc 1er argument req
   },
 });
 
+  // Recupere la requete pour coller const fileName ds la requete
 function makeFilename(req, file) {
-  //recupere la requete pour coller const fileName ds la requete
+
   console.log("req, file:", file);
   const fileName = `${Date.now()}-${file.originalname}`.replace(/\s/g, "-"); //Date.now pour eviter les doublons pour les noms envoyés enregistrés// originalname pour preciser jpeg ou tiff ou png...
   //replace permet de supprimer les espaces(voir Whitespace) et les remplace en 2 eme param avec un tiret
