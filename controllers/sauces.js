@@ -1,7 +1,13 @@
 const mongoose = require("mongoose");
-
-const { unlink } = require("fs"); //filesystem
-//import {unlink} from 'fs'; crash
+//------------------- unlink v1 ---------------------------------
+//const { unlink } = require("fs"); //filesystem api
+//revient à écrire:
+//const  unlink = require("fs").unlink; //filesystem api
+//import {unlink} from 'fs'; NON! crash!!
+//------------------unlink v2 ------------------------------------
+// On transforme le unlink en promesse avec la methode promises.unlink
+//const { unlink } = require("fs").promises.unlink;
+const { unlink } = require("fs/promises");
 
 //on fait communiquer les nouveaux produits avec la base de donnée
 const productSchema = new mongoose.Schema({
@@ -45,29 +51,41 @@ function getSauceById(req, res) {
     .catch((err) => res.status(500).send(err));
 }
 
-// Efface la sauce de la base de donnée et enlève de l'affichage sans enlever l'image du back
+// Supprime la sauce de la base de donnée et enlève  l'image de l'affichage
 
 function deleteSauceById(req, res) {
-  console.log("delete la sauce de mongo !!!");
   const id = req.params.id;
-
-  Product.findByIdAndDelete(id)
+  Product.findByIdAndDelete(id) //ordonne la suppression de l'id de l'image vers MongoDB
     //Product.findOneAndDelete({_id: id})
-    .then((product) => {
-      console.log("product",product );
-      deleteImage(product.imageUrl);
-    })
-    .then(() => res.send({ message: "fonctionne" }))
+    // .then((product) => {
+    //    console.log("product",product );
+    //    //deleteImage(product.imageUrl);
+    //    deleteImage(product);
+    //  })
+    .then(deleteImage) //Renvoie "image deja supprimée" ou product s'il ne la pas dans le backend //supprime image localement mais s'il ne l'a pas indique-le
+    //.then(() => res.send({ message: "produit supprimé" }))
+    //récupère product dans la DB:
+    .then((product) => res.send({ message: product })) //envoie message de succès au site web(client)
     .catch((err) => res.status(500).send({ message: err }));
+  console.log("delete la sauce de mongo !!!");
 }
 
-// Effacer l'image stockée dans le dossier image du dossier back du projet:
-function deleteImage(imageUrl) {
+// Supprime l'image stockée dans le dossier image dans le serveur local de notre backend  :
+//function deleteImage(imageUrl) {
+function deleteImage(product) {
+  const imageUrl = product.imageUrl; //recupère l'imageUrl de product
   const fileToDelete = imageUrl.split("/").pop(); //ne garde que la derniere partie
-  if (fileToDelete == "") return;
-  unlink(`images/${fileToDelete}`, (err) => {
-    console.error("problème sur la suppression de l'image", err);
-  });
+  //if (fileToDelete == " ")return  ;
+  //passe en argument ce que l'on veut enlever (fonctionn asynchrone avec une promesse car ('fs').promises.unlink)
+  // v1 :
+  // unlink(`images/${fileToDelete}`, (err) => {
+  //   console.error("problème sur la suppression de l'image", err);
+  // });
+  // v2 :
+  return unlink(`images/${fileToDelete}`).then(() => product); //renvoie une promesse qui ne va pas résoudre si elle return elle reject et le .then(()=> product) qui retourne product ne sera pas envoyé et donc le catch(err 500) de deleteSauceById sera toujours invoqué en cas de problème.
+  //on a rajouté un .then car le return de unlink nous donnait une réponse undefined
+  // return "image déjà supprimée du serveur local"; //return pour product
+  //return product; //return pour product
 }
 
 // Créer et Ajouter une nouvelle sauce avec de nouvelles données que l'on va remplir dans le body de la requète:
