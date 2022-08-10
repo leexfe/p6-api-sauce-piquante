@@ -13,7 +13,7 @@ require("./mongo");
 // Connection à users de controllers:
 const { createUser, logUser } = require("./controllers/users");
 //const { getSauces, createSauce , putSauceById} = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
-const { getSauces, createSauce , getSauceById, deleteSauceById } = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
+const { getSauces, createSauce , getSauceById, deleteSauceById, modifySauceById } = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
 console.log(getSauces, "get Sauces depuis Index!");
 
 
@@ -40,7 +40,7 @@ app.post("/api/auth/login", logUser);
 // Récupérer et afficher toutes les sauces stockées dans la base de donnée :
 app.get("/api/sauces", authenticateUser, getSauces); //authenticateUser dans middleware/auth.js puis getSauces dans controllers/ sauces.js
 
-// Affiche la sauce spécifique sélectionnée:
+// Afficher la sauce spécifique sélectionnée:
 app.get("/api/sauces/:id", authenticateUser, getSauceById)// : devant id pour variable
 
 // Poster une nouvelle sauce sur le site :
@@ -49,6 +49,8 @@ app.post("/api/sauces", authenticateUser, upload, createSauce); //UPLOAD est dé
 // Effacer une sauce spécifique via son identifiant : 
 app.delete("/api/sauces/:id", authenticateUser, deleteSauceById);// 
 
+// Modifier le contenu d'une sauce :
+app.put("/api/sauces/:id", authenticateUser, upload, modifySauceById);
 
 // afficher reponse via port 3000 : 
 app.get("/", (req, res) => res.send("hello world on port 3000"));

@@ -88,6 +88,42 @@ function deleteImage(product) {
   //return product; //return pour product
 }
 
+// Modifier  le contenu de la sauce :
+
+function modifySauceById(req, res) {
+  const body = req.body; // syntaxe courte : const {body, file} = req
+  const file = req.file;
+  
+  //recuperer l'id ds params de l'url:
+  const params = req.params;
+  //le id est à l'intérieur de params qui est à l'intérieur de req
+  const id = params.id;
+  console.log({ body, file, params });
+  //const sauceData = JSON.parse(body.sauce);// s'il n y a pas de fichier image changé cela provoque une erreur interne 500 car il manque une donnée dans le body et il ne trouve pas ce qu'il cherche donc on rajoute une condition: mais on ne peut pas faire un const à l'intérieur d'un if: si body.sauce différent de null
+  // let sauceData;
+
+  // // Dans le cas ou il n y a pas d'image changée:
+
+  // if (body.sauce != null) {
+  //   sauceData = JSON.parse(body.sauce);
+  // }
+  // console.log("_________________");
+  // console.log("body.sauce", body.sauce);
+  // const { name, manufacturer, description, mainPepper, heat, userId } =
+  //   sauceData;
+
+  // Product.findByIdAndUpdate(id, {
+  //   name,
+  //   manufacturer,
+  //   description,
+  //   mainPepper,
+  //   heat,
+  //   userId,
+  // })
+  //   .then((res) => console.log("FIND ID AND UPDATE", res))
+  //   .catch(console.error);
+}
+
 // Créer et Ajouter une nouvelle sauce avec de nouvelles données que l'on va remplir dans le body de la requète:
 function createSauce(req, res) {
   //le res ici concerne express qui nous donne accès à un objet réponse
@@ -133,4 +169,10 @@ function createSauce(req, res) {
 
 //la fonction checkToken va loger l'erreur et le decoded
 
-module.exports = { getSauces, createSauce, getSauceById, deleteSauceById };
+module.exports = {
+  getSauces,
+  createSauce,
+  getSauceById,
+  deleteSauceById,
+  modifySauceById,
+};
