@@ -65,63 +65,68 @@ function deleteSauceById(req, res) {
     .then(deleteImage) //Renvoie "image deja supprimée" ou product s'il ne la pas dans le backend //supprime image localement mais s'il ne l'a pas indique-le
     //.then(() => res.send({ message: "produit supprimé" }))
     //récupère product dans la DB:
-    .then((product) => res.send({ message: product })) //envoie message de succès au site web(client)
+    //.then((product) => res.send({ message: product })) //envoie message de succès au site web(client)
+
+    .then((product) => {
+      if (product == null) {
+        console.log("nothing to update");
+        res.status(404).send({ message: "object not found in database" });
+      }
+      console.log("Update le Body by id! :", product);
+      res.status(200).send({ message: "successfully uptated" });
+    })
+
     .catch((err) => res.status(500).send({ message: err }));
   console.log("delete la sauce de mongo !!!");
 }
 
 // Supprime l'image stockée dans le dossier image dans le serveur local de notre backend  :
 //function deleteImage(imageUrl) {
+
 function deleteImage(product) {
   const imageUrl = product.imageUrl; //recupère l'imageUrl de product
   const fileToDelete = imageUrl.split("/").pop(); //ne garde que la derniere partie
-  //if (fileToDelete == " ")return  ;
-  //passe en argument ce que l'on veut enlever (fonctionn asynchrone avec une promesse car ('fs').promises.unlink)
-  // v1 :
-  // unlink(`images/${fileToDelete}`, (err) => {
-  //   console.error("problème sur la suppression de l'image", err);
-  // });
-  // v2 :
-  return unlink(`images/${fileToDelete}`).then(() => product); //renvoie une promesse qui ne va pas résoudre si elle return elle reject et le .then(()=> product) qui retourne product ne sera pas envoyé et donc le catch(err 500) de deleteSauceById sera toujours invoqué en cas de problème.
-  //on a rajouté un .then car le return de unlink nous donnait une réponse undefined
-  // return "image déjà supprimée du serveur local"; //return pour product
-  //return product; //return pour product
+  return unlink(`images/${fileToDelete}`).then(() => product);
 }
 
+
+
+ // Fabrique l'URL d'une image à partir de son nom de fichier
+ function makeImageUrl(req, fileName) {
+  return req.protocol + "://" + req.get("host") + "/images/" + fileName;
+}
 // Modifier  le contenu de la sauce :
 
 function modifySauceById(req, res) {
+  const id = req.params.id; // const {params: {id}} = req //autre syntaxe +courte
   const body = req.body; // syntaxe courte : const {body, file} = req
   const file = req.file;
-  
-  //recuperer l'id ds params de l'url:
-  const params = req.params;
-  //le id est à l'intérieur de params qui est à l'intérieur de req
-  const id = params.id;
-  console.log({ body, file, params });
-  //const sauceData = JSON.parse(body.sauce);// s'il n y a pas de fichier image changé cela provoque une erreur interne 500 car il manque une donnée dans le body et il ne trouve pas ce qu'il cherche donc on rajoute une condition: mais on ne peut pas faire un const à l'intérieur d'un if: si body.sauce différent de null
-  // let sauceData;
+  console.log({ body, id, file }); //affiche le nouveau body que j'ai moi meme modifié
 
-  // // Dans le cas ou il n y a pas d'image changée:
+  //s'il ya une image hasNewImage est vrai (boolean)
+  const hasNewImage = req.file != null;
+  if (!hasNewImage) payload = body;
+  console.log("hasNewImage", hasNewImage);
+ //on definit un payload et s il n y apas de nouvelle image il sera égal à req.body
+  //let payload;
+  //const payload = makePayload()//invoque la fonction makePayload
+  const payload = JSON.parse(body.sauce)//
+  payload.imageUrl = makeImageUrl(req, req.file.fileName)
+  console.log("#################");
+  console.log("et voici le payload", payload);
+  console.log("nouvelle image à gérer");
+  console.log("voici le body:", body.sauce);
 
-  // if (body.sauce != null) {
-  //   sauceData = JSON.parse(body.sauce);
-  // }
-  // console.log("_________________");
-  // console.log("body.sauce", body.sauce);
-  // const { name, manufacturer, description, mainPepper, heat, userId } =
-  //   sauceData;
-
-  // Product.findByIdAndUpdate(id, {
-  //   name,
-  //   manufacturer,
-  //   description,
-  //   mainPepper,
-  //   heat,
-  //   userId,
-  // })
-  //   .then((res) => console.log("FIND ID AND UPDATE", res))
-  //   .catch(console.error);
+  Product.findByIdAndUpdate(id, body)
+    .then((resdatabody) => {
+      if (resdatabody == null) {
+        console.log("nothing to update");
+        res.status(404).send({ message: "object not found in database" });
+      }
+      console.log("Update le Body by id! :", resdatabody);
+      res.status(200).send({ message: "successfully uptated" });
+    })
+    .catch((err) => console.error(" problème sur le update!", err));
 }
 
 // Créer et Ajouter une nouvelle sauce avec de nouvelles données que l'on va remplir dans le body de la requète:
