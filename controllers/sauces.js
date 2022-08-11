@@ -41,7 +41,7 @@ function getSauces(req, res) {
 // Affiche la sauce spécifique qui a été sélectionnée à partir la page sauces:
 function getSauceById(req, res) {
   const id = req.params.id; //syntaxe plus propre const {id} = req.params
-  console.log("----------------------- params");
+  console.log("guette le get!","----------------------- params");
   console.log("params", req.params);
   Product.findById(id)
     .then((product) => {
@@ -89,10 +89,8 @@ function deleteImage(product) {
   return unlink(`images/${fileToDelete}`).then(() => product);
 }
 
-
-
- // Fabrique l'URL d'une image à partir de son nom de fichier
- function makeImageUrl(req, fileName) {
+// Fabrique l'URL d'une image à partir de son nom de fichier
+function makeImageUrl(req, fileName) {
   return req.protocol + "://" + req.get("host") + "/images/" + fileName;
 }
 // Modifier  le contenu de la sauce :
@@ -102,22 +100,18 @@ function modifySauceById(req, res) {
   const body = req.body; // syntaxe courte : const {body, file} = req
   const file = req.file;
   console.log({ body, id, file }); //affiche le nouveau body que j'ai moi meme modifié
+  //on parse la chaine de caractere pour en faire un objet et recuperer
 
-  //s'il ya une image hasNewImage est vrai (boolean)
-  const hasNewImage = req.file != null;
-  if (!hasNewImage) payload = body;
-  console.log("hasNewImage", hasNewImage);
- //on definit un payload et s il n y apas de nouvelle image il sera égal à req.body
-  //let payload;
   //const payload = makePayload()//invoque la fonction makePayload
-  const payload = JSON.parse(body.sauce)//
-  payload.imageUrl = makeImageUrl(req, req.file.fileName)
-  console.log("#################");
-  console.log("et voici le payload", payload);
-  console.log("nouvelle image à gérer");
-  console.log("voici le body:", body.sauce);
+  //s'il ya une image hasNewImage est vrai (boolean)
+  const hasNewImage = req.file != null; // != et non !== pour que null soit reconnu comme étant undefined
+  const payload = makePayload(hasNewImage, req);
+  //on definit un payload et s il n y a pas de nouvelle image il sera égal à req.body
+  //let payload;
+  // if (!hasNewImage) return body
+  // console.log("hasNewImage", hasNewImage);
 
-  Product.findByIdAndUpdate(id, body)
+  Product.findByIdAndUpdate(id, payload) //payload en param pour si le body est changé
     .then((resdatabody) => {
       if (resdatabody == null) {
         console.log("nothing to update");
@@ -127,6 +121,19 @@ function modifySauceById(req, res) {
       res.status(200).send({ message: "successfully uptated" });
     })
     .catch((err) => console.error(" problème sur le update!", err));
+}
+// fabrique nouveau payload si nouvelle image en fonction de la requète de modifysauceById
+function makePayload(hasNewImage, req) {
+  //if (!hasNewImage) payload = body
+  if (!hasNewImage) return req.body; //pas de vouvelle image la fonction stoppe!
+  console.log("hasNewImage", hasNewImage);
+  const payload = JSON.parse(req.body.sauce);
+   payload.imageUrl = makeImageUrl(req, req.file.fileName);//on passe un objet puis une propriété de l'objet que l'on vient de lui passer// revient à req.protocol + "://" + req.get("host") + "/images/" + fileName;
+  // console.log("#################");
+  console.log("et voici le payload", payload);
+  console.log("nouvelle image à gérer");
+  console.log("voici le body:", req.body.sauce);
+  return payload;
 }
 
 // Créer et Ajouter une nouvelle sauce avec de nouvelles données que l'on va remplir dans le body de la requète:
@@ -158,7 +165,7 @@ function createSauce(req, res) {
     manufacturer: manufacturer,
     description: description,
     mainPepper: mainPepper,
-    imageUrl: makeImageUrl(req, fileName),
+    imageUrl: makeImageUrl(req, fileName),//req.protocol + "://" + req.get("host") + "/images/" + fileName;
     heat: heat,
     likes: 0,
     dislikes: 0,
