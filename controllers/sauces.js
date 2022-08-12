@@ -73,7 +73,7 @@ function deleteSauceById(req, res) {
     //   res.status(200).send({ message: "successfully updated" });
     // })
     .then((productitem) => deleteImage(productitem))
-    .then((res) => console.log ("file deleted",res))
+    .then((res) => console.log("file deleted", res))
     .catch((err) => res.status(500).send({ message: err }));
   console.log("delete la sauce de mongo !!!");
 }
@@ -83,10 +83,10 @@ function deleteSauceById(req, res) {
 
 function deleteImage(product) {
   //si null tu t'arretes
-  if(product == null) return "n'existe pas dans la base de donnée";//monggose ne renvoie pas d'erreur s'il ne trouve rien dans la base de donnée. à nous de créer cette condition
+  if (product == null) return "n'existe pas dans la base de donnée"; //monggose ne renvoie pas d'erreur s'il ne trouve rien dans la base de donnée. à nous de créer cette condition
   const imageUrl = product.imageUrl; //recupère l'imageUrl de product
   const fileToDelete = imageUrl.split("/").pop(); //ne garde que la derniere partie
-  return unlink(`images/${fileToDelete}`)//  unlink ne retourne rien mais pour bonne pratique placer un return à la fin d'une promesse //ici le unlink est déjà un promesse de part la methode asssocié à "fs/promises"
+  return unlink(`images/${fileToDelete}`); //  unlink ne retourne rien mais pour bonne pratique placer un return à la fin d'une promesse //ici le unlink est déjà un promesse de part la methode asssocié à "fs/promises"
   // .then((res) => console.log ("file deleted",res))  //renvoyer ds la function  modifSauce en-dessous de deleteImage
   // //return unlink("images/" + fileToDelete.then(() => product);
   // .catch((err) => console.error("!!!!!!!!!!!!!!!!!!!","problem deleting file!!!!!", err))
@@ -115,7 +115,7 @@ function modifySauceById(req, res) {
   // console.log("hasNewImage", hasNewImage);
   //va chercher le product by id à partir du param url qu'il faut ensuite modifier en base de donnée(body tranformé en payload)
   Product.findByIdAndUpdate(id, payload) //payload en param pour le body qu'on va transformer et lui passer s'il ya une nouvelle image
-  //envoie le produit à la fonction sendClientResponse
+    //envoie le produit à la fonction sendClientResponse
     .then((resdatabody) => sendClientResponse(resdatabody, res)) // si le sendClientResponse n'est pas nul on lui enchaine la promesse suivante deleteImage:
     // .then((resdatabody) => {
     //   if (resdatabody == null) {
@@ -127,10 +127,12 @@ function modifySauceById(req, res) {
     // })
     //s'il trouve le produit il l'enlève du serveur du dossier back dans images
     .then((product) => deleteImage(product))
-    .then((res) => console.log ("file deleted",res))
+    .then((res) => console.log("file deleted", res))
     //return unlink("images/" + fileToDelete.then(() => product);
-    .catch((err) => console.error("!!!!!!!!!!!!!!!!!!!","problem deleting file!!!!!", err))
-    // .catch((err) => console.error(" problème sur le update!", err));
+    .catch((err) =>
+      console.error("!!!!!!!!!!!!!!!!!!!", "problem deleting file!!!!!", err)
+    );
+  // .catch((err) => console.error(" problème sur le update!", err));
 }
 
 // fabrique nouveau payload si nouvelle image en fonction de la requète de modifysauceById
@@ -156,7 +158,7 @@ function sendClientResponse(product, res) {
     return res.status(404).send({ message: "object not found in database" });
   }
   console.log("Update le Body by id! :", product);
-  return Promise.resolve(res.status(200).send(product)).then(() => product)
+  return Promise.resolve(res.status(200).send(product)).then(() => product); // on ne peut pas placer un .then directement derrière un res.send donc obligé de de passer l'ensemble entre parenthèse collé à la méthode Promise.resolve
 }
 
 // Créer et Ajouter une nouvelle sauce avec de nouvelles données que l'on va remplir dans le body de la requète:
@@ -196,13 +198,78 @@ function createSauce(req, res) {
     usersDisliked: [],
   });
   product
-    .save()
+    .save()// methode pour sauvegarder le body
     .then((message) => res.status(201).send({ message })) //attention au conflit (internal servor error 500) pour cela on a nommé message à la place de res qui represente le param de la fonction createSauce et non la reponse(message) de product.
     //.catch(console.error);
     .catch((err) => res.status(500).send(err));
 }
 
-//la fonction checkToken va loger l'erreur et le decoded
+function likeSauce(req, res) {
+  const id = req.params.id; // const {params: {id}} = req
+  const like = req.body.like;
+  const userId = req.body.userId;
+  //methode Array.includes !
+  //si l'array ne contient pas le like alors le like n'est ni égal à 0, 1 ni -1 et on stoppe la fonction
+  // methode qui facilit grandement et évite l'accumulation de if et else
+  console.log("fonction likeSauce invoquée", "*********************");
+  if (![-1, 0, 1].includes(like))
+    return res.status(403({ message: "bad request, invalid like value" }));
+  console.log(
+    "ce message apparait si like vaut -1, 0, 1",
+    "***********************"
+  );
+  Product.findById(id)
+    .then((product) => updateLike(product, like, userId))
+    // .then((product) => {
+    //   console.log("the product to like is:", product);
+    //   sendClientResponse(product, res);
+    // })
+    .catch((err) => res.status(500).send(err));
+}
+
+//function updateLike(product, like, userId) {
+function updateLike(product, like, userId) {
+  //if (like === 1 || like === -1) return incrementLike(product, userId, like);
+  if (like === 1) incrementLike(product, userId);
+  if (like === -1) incrementLike(product, userId);
+ // if (like === -1) decrementLike(product, userId);
+  // return resetLike(product, userId, res);
+  //product.save();
+}
+
+function incrementLike(product, userId, like) {
+  console.log("ancien like", product.likes);
+  const usersLiked = product.usersLiked; //const { usersLiked, usersDisliked } = product;
+  //let likes = product.likes; //ce likes fabrique une copie du nombre mais on souhait modifier l'objet lui même et non la copie
+  //const  usersDisliked = product.usersDisliked
+  // Par sécurité, on créer votersArray pour éviter un conflit avec usersId dans la programmation du front
+  // Le risque est de push le userId (deux fois ou +) dans usersLiked si le front n'est pas bien configuré // usersLiked.push(userId) est risqué
+  if (usersLiked.includes(userId)) return;
+  usersLiked.push(userId);
+  // likes++; //ce likes fabrique une copie du nombre mais on souhait modifier l'objet lui même et non la copie donc on veut changer product.likes:
+  product.likes++;
+  //console.log("Nouveau likes:", likes);
+  console.log("like sur product  +++++++", product.likes);//les objets sont assignés par références tandis que les primitives sont assignées par valeurs
+  console.log("product after  +++++++++ ", product);
+  // si like === 1 (? pour oui) on push dans usersLiked  sinon on push dans usersDisliked(: pour sinon) 
+   const votersArray = like === 1 ? usersLiked : usersDisliked;// conditional ternary operator
+   console.log("update votersArray", votersArray);
+  // if (votersArray.includes(userId)) return product;
+  // votersArray.push(userId);
+  // like === 1 ? ++product.likes : ++product.dislikes;
+  // return product;
+}
+
+function decrementLike(product, userId){
+  const usersDisliked = product.usersDisliked
+  if (usersDisliked.includes(userId)) return
+  usersDisliked.push(userId)
+  product.dislikes++
+  console.log("product.usersDisliked - - - -",product.usersDisliked)
+  console.log("product after dislike - - - -",product)
+}
+
+
 
 module.exports = {
   getSauces,
@@ -210,4 +277,5 @@ module.exports = {
   getSauceById,
   deleteSauceById,
   modifySauceById,
+  likeSauce,
 };

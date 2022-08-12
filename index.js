@@ -1,9 +1,8 @@
 console.log("hello world");
-const { app, express } = require("./server");//on importe app et express depuis le fichier server
+const { app, express } = require("./server"); //on importe app et express depuis le fichier server
 const port = 3000;
 const bodyParser = require("body-parser"); //retourne un middleware
 const path = require("path"); // fournit des fonctions utiles pour interagir avec les chemins relatifs de fichiers//fixer pour avoir un chemin absolu
-
 
 // Connection à la database
 require("./mongo");
@@ -13,9 +12,15 @@ require("./mongo");
 // Connection à users de controllers:
 const { createUser, logUser } = require("./controllers/users");
 //const { getSauces, createSauce , putSauceById} = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
-const { getSauces, createSauce , getSauceById, deleteSauceById, modifySauceById } = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
+const {
+  getSauces,
+  createSauce,
+  getSauceById,
+  deleteSauceById,
+  modifySauceById,
+  likeSauce,
+} = require("./controllers/sauces"); // invoqué par app . donc express aura deux arguments
 console.log(getSauces, "get Sauces depuis Index!");
-
 
 //---------------------
 // MIDDLEWARE
@@ -32,7 +37,7 @@ app.use("/images", express.static("images")); //rend le dossier accessible à to
 // ROUTES
 //------------------------------
 //  Inscrire un  nouveau client:
-app.post("/api/auth/signup", createUser); 
+app.post("/api/auth/signup", createUser);
 
 // Connecter un client déjà connu:
 app.post("/api/auth/login", logUser);
@@ -41,18 +46,21 @@ app.post("/api/auth/login", logUser);
 app.get("/api/sauces", authenticateUser, getSauces); //authenticateUser dans middleware/auth.js puis getSauces dans controllers/ sauces.js
 
 // Afficher la sauce spécifique sélectionnée:
-app.get("/api/sauces/:id", authenticateUser, getSauceById)// : devant id pour variable
+app.get("/api/sauces/:id", authenticateUser, getSauceById); // : devant id pour variable
 
 // Poster une nouvelle sauce sur le site :
 app.post("/api/sauces", authenticateUser, upload, createSauce); //UPLOAD est déclaré en constante et require le chemin pour atteindre le fichier multer.js
 
-// Effacer une sauce spécifique via son identifiant : 
-app.delete("/api/sauces/:id", authenticateUser, deleteSauceById);// 
+// Effacer une sauce spécifique via son identifiant :
+app.delete("/api/sauces/:id", authenticateUser, deleteSauceById); //
 
 // Modifier le contenu d'une sauce :
 app.put("/api/sauces/:id", authenticateUser, upload, modifySauceById);
 
-// afficher reponse via port 3000 : 
+// Liker une sauce:
+app.post("/api/sauces/:id/like", authenticateUser, likeSauce);
+
+// afficher reponse via port 3000 :
 app.get("/", (req, res) => res.send("hello world on port 3000"));
 
 // listen
@@ -68,4 +76,3 @@ app.use("/images", express.static(path.join(__dirname, "images")));
 app.listen(port, () => console.log("Listening on port" + port)); //le port du serveur est 3000
 
 //------------------------------------------------------------------------------------------------
-
