@@ -198,7 +198,7 @@ function createSauce(req, res) {
     usersDisliked: [],
   });
   product
-    .save()// methode pour sauvegarder le body
+    .save() // methode pour sauvegarder le body
     .then((message) => res.status(201).send({ message })) //attention au conflit (internal servor error 500) pour cela on a nommé message à la place de res qui represente le param de la fonction createSauce et non la reponse(message) de product.
     //.catch(console.error);
     .catch((err) => res.status(500).send(err));
@@ -211,65 +211,105 @@ function likeSauce(req, res) {
   //methode Array.includes !
   //si l'array ne contient pas le like alors le like n'est ni égal à 0, 1 ni -1 et on stoppe la fonction
   // methode qui facilit grandement et évite l'accumulation de if et else
-  console.log("fonction likeSauce invoquée", "*********************");
+  console.log("fonction likeSauce invoquée *********************");
   if (![-1, 0, 1].includes(like))
-    return res.status(403({ message: "bad request, invalid like value" }));
+    return res.status(403).send({ message: "bad request, invalid like value" });
   console.log(
-    "ce message apparait si like vaut -1, 0, 1",
-    "***********************"
+    "*********************** ce message apparait si like vaut -1, 0, 1"
   );
   Product.findById(id)
-    .then((product) => updateLike(product, like, userId))
-    // .then((product) => {
-    //   console.log("the product to like is:", product);
-    //   sendClientResponse(product, res);
-    // })
+    .then((product) => updateVote(product, like, userId, res)) //nécessite d'avoir la reponse pour renvoyer une erreur
+
+    .then((productsave) => {
+      console.log("the productsave to like is:", productsave);
+      sendClientResponse(productsave, res);
+    })
     .catch((err) => res.status(500).send(err));
 }
 
+//necessite res en argument pour renvoyer une reponse en cas d'erreur sur resetVote
 //function updateLike(product, like, userId) {
-function updateLike(product, like, userId) {
-  //if (like === 1 || like === -1) return incrementLike(product, userId, like);
-  if (like === 1) incrementLike(product, userId);
-  if (like === -1) incrementLike(product, userId);
- // if (like === -1) decrementLike(product, userId);
+function updateVote(product, like, userId, res) {
+  //nécessite d'avoir la reponse pour renvoyer une erreur
+  if (like === 1 || like === -1) return incrementVote(product, userId, like);
+  //if (like === 1 || like === -1) incrementLike(product, userId);
+  // if (like === 1) incrementLike(product, userId);
+  // if (like === -1) incrementLike(product, userId);
+  //if (like === -1) decrementLike(product, userId);
   // return resetLike(product, userId, res);
-  //product.save();
+
+ // if (like === 0) resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur
+  //product.save(); //sauvegarde le produit
+
+  return product.save()
+  //!!!! obligé d'avoir une valeur de retour à passer à updateVote sinon updateVote ne passera rien au .then d'après
 }
 
-function incrementLike(product, userId, like) {
-  console.log("ancien like", product.likes);
+//le resetVote nécessite d'avoir la reponse pour renvoyer une erreur en cas de conflit si [usersLiked, usersDisliked] ont le même userId donc on pas res en argument:
+function resetVote(product, userId, res) {
   const usersLiked = product.usersLiked; //const { usersLiked, usersDisliked } = product;
-  //let likes = product.likes; //ce likes fabrique une copie du nombre mais on souhait modifier l'objet lui même et non la copie
-  //const  usersDisliked = product.usersDisliked
-  // Par sécurité, on créer votersArray pour éviter un conflit avec usersId dans la programmation du front
-  // Le risque est de push le userId (deux fois ou +) dans usersLiked si le front n'est pas bien configuré // usersLiked.push(userId) est risqué
-  if (usersLiked.includes(userId)) return;
-  usersLiked.push(userId);
-  // likes++; //ce likes fabrique une copie du nombre mais on souhait modifier l'objet lui même et non la copie donc on veut changer product.likes:
-  product.likes++;
-  //console.log("Nouveau likes:", likes);
-  console.log("like sur product  +++++++", product.likes);//les objets sont assignés par références tandis que les primitives sont assignées par valeurs
-  console.log("product after  +++++++++ ", product);
-  // si like === 1 (? pour oui) on push dans usersLiked  sinon on push dans usersDisliked(: pour sinon) 
-   const votersArray = like === 1 ? usersLiked : usersDisliked;// conditional ternary operator
-   console.log("update votersArray", votersArray);
-  // if (votersArray.includes(userId)) return product;
-  // votersArray.push(userId);
-  // like === 1 ? ++product.likes : ++product.dislikes;
-  // return product;
+  const usersDisliked = product.usersDisliked;
+  // CAS D'ERREUR :
+  //const arrayToUpdate = usersLiked.includes(userId) ? usersLiked : usersDisliked//si oui on update usersliked sinon usersDisliked// risqué si pour une raison inconnue, le userId est soit dans aucun des des deux, soit dans les deux
+  // Méthode Array.every() vérifie toutes les valeurs dans un array: on applique la fonction à chaque élément de l'array:
+  // si pour chacun des arrays de usersLiked et usersDisliked l'array inclus le userId c'est qu'on a une erreur car on ne peut pas avoir les deux en même temps
+  if ([usersLiked, usersDisliked].every((array) => array.includes(userId)))
+    return res.satus(500).send({
+      message: "conflicting vote, impossible to like ans dislike together",
+    });
+  // Méthode : array.some verifie si certaines des valeurs du array répondent à une condition
+  // si un seul ne passe pas la validation alors message d'erreur car ! devant represente la negation
+  //si pour chacun des arrays de usersLiked et usersDisliked, on (a aucun) on n'a pas au moins un userId dans chacun des tableaux alors erreur car vote vide
+  if (![usersLiked, usersDisliked].some((array) => array.includes(userId)))
+    return res.satus(500).send({
+      message: "conflicting vote, because vote empty",
+    });
+  // updater le like ou le disLike
+  const voteToUpdate = usersLiked.includes(userId) ? usersLiked : usersDisliked;
+  console.log("//////////// Vote to update /////////////", voteToUpdate);
+  //on sait maintenant que le userId est soit dans l'un soit dans l'autre des tableaux usersLiked ou usersDisliked
+  let arrayToUpdate = usersLiked.includes(userId) //let et non const pour pouvoir reassigner la variable!
+    ? usersLiked
+    : usersDisliked;
+  // Méthode filter (): renvoie un array ou chaque element aura passer le test pour savoir s'il est différent de userId
+  //filtre et récupère uniquement tout les id qui sont differents du userId
+  const arrayWithoutUser = arrayToUpdate.filter((id) => id !== userId); //renvoie un nouvel arrayWithoutUser sans changer l'arrayToUpdate donc on va le réassigner:
+  arrayToUpdate = arrayWithoutUser;
 }
 
-function decrementLike(product, userId){
-  const usersDisliked = product.usersDisliked
-  if (usersDisliked.includes(userId)) return
-  usersDisliked.push(userId)
-  product.dislikes++
-  console.log("product.usersDisliked - - - -",product.usersDisliked)
-  console.log("product after dislike - - - -",product)
+function incrementVote(product, userId, like) {
+  // console.log("ancien like", product.likes);
+  const usersLiked = product.usersLiked; //const { usersLiked, usersDisliked } = product;
+  const usersDisliked = product.usersDisliked;
+  // if (usersLiked.includes(userId)) return;//si l'utilisateur liké inclus  déjà le like de l'utilisateur stoppe
+  // usersLiked.push(userId);
+  // product.likes++;
+  // console.log("like sur product  +++++++", product.likes);//les objets sont assignés par références tandis que les primitives sont assignées par valeurs
+  // console.log("product after  +++++++++ ", product);
+
+  // si like === 1 (? pour oui) on push dans usersLiked  sinon on push dans usersDisliked(: pour sinon)
+  const votersArray = like === 1 ? usersLiked : usersDisliked; // conditional ternary operator
+  console.log("update votersArray", votersArray);
+  if (votersArray.includes(userId)) return product; //si l'utilisateur(voteur) liké inclus déjà le like de l'utilisateur stoppe et renvoie product
+  votersArray.push(userId);
+
+  let voteToUpdate = like === 1 ? ++product.likes : ++product.dislikes;
+  voteToUpdate++;
+  //like === 1 ? ++product.likes : ++product.dislikes;
+   console.log(" voteToUpdate !!!!!!!!!!!!", voteToUpdate);
+  console.log(" product apres vote !!!!!!!!!!!", product);
+   return product;
+ 
 }
 
-
+function decrementLike(product, userId) {
+  const usersDisliked = product.usersDisliked;
+  if (usersDisliked.includes(userId)) return;
+  usersDisliked.push(userId);
+  product.dislikes++;
+  console.log("product.usersDisliked - - - -", product.usersDisliked);
+  console.log("product after dislike - - - -", product);
+}
 
 module.exports = {
   getSauces,
