@@ -224,49 +224,64 @@ function likeSauce(req, res) {
       console.log("the productsave to like is:", productsave);
       sendClientResponse(productsave, res);
     })
-    .catch((err) => res.status(500).send(err));
+    .catch((err) => res.status(500).send( err));
 }
 
 //necessite res en argument pour renvoyer une reponse en cas d'erreur sur resetVote
 //function updateLike(product, like, userId) {
 function updateVote(product, like, userId, res) {
-  //nécessite d'avoir la reponse pour renvoyer une erreur
-  if (like === 1 || like === -1) return incrementVote(product, userId, like);
+  //nécessite d'avoir la reponse pour renvoyer une erreur:
+
+  //if (like === 1 || like === -1) return incrementVote(product, userId, like);//s'arrete direct avec le return et passe le relai à incrementVote si 1 ou -1 donc empeche de continuer pour avoir le return sur product.save
+
+  if (like === 1 || like === -1)  incrementVote(product, userId, like); //!!!!!!!!!!!!!!!!!!!!! atention  enlever return sur incrementVote si appel de fonction resetVote avant le return product.save() sinon ne continue pas !!!!!!!!!!!!
   //if (like === 1 || like === -1) incrementLike(product, userId);
   // if (like === 1) incrementLike(product, userId);
   // if (like === -1) incrementLike(product, userId);
   //if (like === -1) decrementLike(product, userId);
   // return resetLike(product, userId, res);
 
- // if (like === 0) resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur
+  //le return devant resetVote permet de renoyer l'erreur mais empeche de lire et de retourner le product.save
+
+  //if (like === 0) resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur
+  if (like === 0) return resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur
+
   //product.save(); //sauvegarde le produit
 
-  return product.save()
+  return product.save();
   //!!!! obligé d'avoir une valeur de retour à passer à updateVote sinon updateVote ne passera rien au .then d'après
 }
 
-//le resetVote nécessite d'avoir la reponse pour renvoyer une erreur en cas de conflit si [usersLiked, usersDisliked] ont le même userId donc on pas res en argument:
+//le resetVote nécessite d'avoir la reponse pour renvoyer une erreur en cas de conflit si [usersLiked, usersDisliked] ont le même userId donc on passe res en argument:
 function resetVote(product, userId, res) {
   const usersLiked = product.usersLiked; //const { usersLiked, usersDisliked } = product;
   const usersDisliked = product.usersDisliked;
   // CAS D'ERREUR :
-  //const arrayToUpdate = usersLiked.includes(userId) ? usersLiked : usersDisliked//si oui on update usersliked sinon usersDisliked// risqué si pour une raison inconnue, le userId est soit dans aucun des des deux, soit dans les deux
+  //const arrayToUpdate = usersLiked.includes(userId) ? usersLiked : usersDisliked //si oui on update usersliked sinon usersDisliked// risqué si pour une raison inconnue, le userId est soit dans aucun des deux, soit dans les deux
   // Méthode Array.every() vérifie toutes les valeurs dans un array: on applique la fonction à chaque élément de l'array:
   // si pour chacun des arrays de usersLiked et usersDisliked l'array inclus le userId c'est qu'on a une erreur car on ne peut pas avoir les deux en même temps
-  if ([usersLiked, usersDisliked].every((array) => array.includes(userId)))
-    return res.satus(500).send({
-      message: "conflicting vote, impossible to like ans dislike together",
-    });
+  //Promise.reject
+  if ([usersLiked, usersDisliked].every((array) => array.includes(userId))) return Promise.reject("Conflicting vote, there is a like and dislike for the same user !!!!!!!")
+    // return res.satus(500).send({
+    //   message: "conflicting vote, impossible to like ans dislike together" });
+    // Promise.reject force à aller dans le catch // attentio à specifier return devant le resetVote dans la fonction updatVote!
+
+   
+   // throw new Error("!!!!!!! Conflicting vote, there is a like and dislike for the same user !!!!!!!")
+   
   // Méthode : array.some verifie si certaines des valeurs du array répondent à une condition
   // si un seul ne passe pas la validation alors message d'erreur car ! devant represente la negation
   //si pour chacun des arrays de usersLiked et usersDisliked, on (a aucun) on n'a pas au moins un userId dans chacun des tableaux alors erreur car vote vide
-  if (![usersLiked, usersDisliked].some((array) => array.includes(userId)))
-    return res.satus(500).send({
-      message: "conflicting vote, because vote empty",
-    });
-  // updater le like ou le disLike
+
+  // if (![usersLiked, usersDisliked].some((array) => array.includes(userId)))
+  //   return res.satus(500).send({
+  //     message: "conflicting vote, because vote empty",  
+  //   });
+
+  // updater le like ou le disLike  
+  //dans mongoDb provoquer conflit en intégrant le même userId dans usersLiked et usersDisliked affiche 500(internal server) et ERROR undefined dans console sans message particulier donc on utilise Promise.reject
   const voteToUpdate = usersLiked.includes(userId) ? usersLiked : usersDisliked;
-  console.log("//////////// Vote to update /////////////", voteToUpdate);
+  console.log("\\\\\\\\\\\\\\ VotetoUpdate  ////////", voteToUpdate);   
   //on sait maintenant que le userId est soit dans l'un soit dans l'autre des tableaux usersLiked ou usersDisliked
   let arrayToUpdate = usersLiked.includes(userId) //let et non const pour pouvoir reassigner la variable!
     ? usersLiked
@@ -274,7 +289,11 @@ function resetVote(product, userId, res) {
   // Méthode filter (): renvoie un array ou chaque element aura passer le test pour savoir s'il est différent de userId
   //filtre et récupère uniquement tout les id qui sont differents du userId
   const arrayWithoutUser = arrayToUpdate.filter((id) => id !== userId); //renvoie un nouvel arrayWithoutUser sans changer l'arrayToUpdate donc on va le réassigner:
+  console.log("------------  arrayToUpdate-BEFORE", arrayToUpdate);
+  console.log("------------ nouveau arrayWithoutUser-BEFORE", arrayWithoutUser);
   arrayToUpdate = arrayWithoutUser;
+  console.log("nouveau arrayWithoutUser-AFTER  +++++++++++++", arrayWithoutUser);
+  console.log(" arrayToUpdate-AFTER  ++++++++++++++++", arrayToUpdate);
 }
 
 function incrementVote(product, userId, like) {
@@ -296,10 +315,9 @@ function incrementVote(product, userId, like) {
   let voteToUpdate = like === 1 ? ++product.likes : ++product.dislikes;
   voteToUpdate++;
   //like === 1 ? ++product.likes : ++product.dislikes;
-   console.log(" voteToUpdate !!!!!!!!!!!!", voteToUpdate);
+  console.log(" voteToUpdate !!!!!!!!!!!!", voteToUpdate);
   console.log(" product apres vote !!!!!!!!!!!", product);
-   return product;
- 
+  return product; // attention à bien retourner product
 }
 
 function decrementLike(product, userId) {
