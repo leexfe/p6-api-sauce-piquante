@@ -204,6 +204,8 @@ function createSauce(req, res) {
     .catch((err) => res.status(500).send(err));
 }
 
+// Notifier
+
 function likeSauce(req, res) {
   const id = req.params.id; // const {params: {id}} = req
   const like = req.body.like;
@@ -212,6 +214,7 @@ function likeSauce(req, res) {
   //si l'array ne contient pas le like alors le like n'est ni égal à 0, 1 ni -1 et on stoppe la fonction
   // methode qui facilit grandement et évite l'accumulation de if et else
   console.log("fonction likeSauce invoquée *********************");
+  //si le like different de -1, 0 ou 1 renvoie message d'erreur
   if (![-1, 0, 1].includes(like))
     return res.status(403).send({ message: "bad request, invalid like value" });
   console.log(
@@ -245,7 +248,7 @@ function updateVote(product, like, userId, res) {
   //le return devant resetVote permet de renoyer l'erreur mais empeche de lire et de retourner le product.save
 
   //if (like === 0) resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur
-  if (like === 0) return resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur//  resetVote doit aussi faire remonter le product donc on place un return à la fin de la fonction resetVote. Elle renvoie le product à updateVote qui est invoquée dans likeSauce
+  if (like === 0) return resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur//  resetVote doit aussi faire remonter le product donc on place un return à la fin de la fonction resetVote. Elle renvoie le product à updateVote qui est invoquée dans likeSauce// on peut noter simplement return resetVote car le 1 et le -1 sont déjà utilisé ds la condition précédente.// le zero est déja préprogrammé au clic dessus (dans le front) mais il faut transmettre l'information et le message d'erreur
 
   //product.save(); //sauvegarde le produit
 
@@ -255,6 +258,7 @@ function updateVote(product, like, userId, res) {
 
 //le resetVote nécessite d'avoir la reponse pour renvoyer une erreur en cas de conflit si [usersLiked, usersDisliked] ont le même userId donc on passe res en argument:
 function resetVote(product, userId, res) {
+  console.log("reset vote BEFORE ###################################", product)
   const usersLiked = product.usersLiked; //const { usersLiked, usersDisliked } = product;
   const usersDisliked = product.usersDisliked;
   // CAS D'ERREUR :
@@ -277,50 +281,89 @@ function resetVote(product, userId, res) {
   //si pour chacun des arrays de usersLiked et usersDisliked, on (a aucun) on n'a pas au moins un userId dans chacun des tableaux alors erreur car vote vide
 
   if (![usersLiked, usersDisliked].some((array) => array.includes(userId)))
-    return Promise.reject("Conflicting vote, because vote of user empty");// et donc automatiquement la préprogrammation du site fait que s'il ya ce conflit, il me l'efface de la bdd sur Mongo
+    return Promise.reject("Conflicting vote, because vote of user empty"); // et donc automatiquement la préprogrammation du site fait que s'il ya ce conflit, il me l'efface de la bdd sur Mongo
 
   // updater le like ou le disLike
   //dans mongoDb provoquer conflit en intégrant le même userId dans usersLiked et usersDisliked affiche 500(internal server) et ERROR undefined dans console sans message particulier donc on utilise Promise.reject
-  const voteToUpdate = usersLiked.includes(userId) ? usersLiked : usersDisliked;
-  console.log("\\\\\\\\\\\\\\ VotetoUpdate  ////////", voteToUpdate);
+  // On arrive ensuite à cette condition propre où on a bien l'un des deux arrays qui contient le userId:
+  //ici products.like est un nombre donc il n'est pas passé par référence mais par valeur et ne sera pas updaté sur le product.
+
+//   let voteToUpdate = usersLiked.includes(userId)// attention let pas const ! 
+//     ? product.likes
+//     : product.dislikes;
+//   voteToUpdate--;// const goodIncrement = ++likes  // const badIncrement == likes++ : mauvais car like assigné avant incrémentation //
+//  usersLiked.includes(userId)
+//     ? (product.likes = voteToUpdate)
+//     : (product.dislike = voteToUpdate);
+
+  // usersLiked.includes(userId)// attention let pas const !  //version simplifié voteUpdate
+  //   ? --product.likes
+  //   : --product.dislikes;
+
+ 
+  //console.log("\\\\\\\\\\\\\\ VotetoUpdate  ////////", voteToUpdate);
   //on sait maintenant que le userId est soit dans l'un soit dans l'autre des tableaux usersLiked ou usersDisliked
-  let arrayToUpdate = usersLiked.includes(userId) //let et non const pour pouvoir reassigner la variable!
-    ? usersLiked
-    : usersDisliked;
+  //si je fais des modifications sur arrayToUpdate cela me mofifiera bien le product lui même car on est bien sur une assignation par référence
+  //on va donc eviter de travailler sur des variables mais travailler directement sur l'objet lui même: donc :
+//nouvelle version : pour être sur qu'on touche l'objet lui même :
+  if (usersLiked.includes(userId)){
+    --product.likes
+   product.usersLiked =  product.usersLiked.filter((id) => id !== userId);
+  } else {
+    --product.dislikes
+    product.usersDisliked =  product.usersDisliked.filter((id) => id !== userId);
+  }
+//ancienne version avec variable qui ne permet pas d'assigner correctement la nouvelle valeur qu'on veut donner à product
+  // let arrayToUpdate = usersLiked.includes(userId) //let et non const pour pouvoir reassigner la variable!
+  //   ? usersLiked
+  //   : usersDisliked;
+
   // Méthode filter (): renvoie un array ou chaque element aura passer le test pour savoir s'il est différent de userId
   //filtre et récupère uniquement tout les id qui sont differents du userId
-  const arrayWithoutUser = arrayToUpdate.filter((id) => id !== userId); //renvoie un nouvel arrayWithoutUser sans changer l'arrayToUpdate donc on va le réassigner:
-  console.log("------------  arrayToUpdate-BEFORE", arrayToUpdate);
-  console.log("------------ nouveau arrayWithoutUser-BEFORE", arrayWithoutUser);
-  arrayToUpdate = arrayWithoutUser;
-  console.log(
-    "nouveau arrayWithoutUser-AFTER  +++++++++++++",
-    arrayWithoutUser
-  );
-  console.log(" arrayToUpdate-AFTER  ++++++++++++++++", arrayToUpdate);
+  // const arrayWithoutUser = arrayToUpdate.filter((id) => id !== userId); //renvoie un nouvel arrayWithoutUser sans changer l'arrayToUpdate donc on va le réassigner:
+
+  // console.log("------------  arrayToUpdate-BEFORE", arrayToUpdate);
+  // console.log("------------ nouveau arrayWithoutUser-BEFORE", arrayWithoutUser);
+  // arrayToUpdate = arrayWithoutUser;
+  // console.log(
+  //   "nouveau arrayWithoutUser-AFTER  +++++++++++++",
+  //   arrayWithoutUser
+  // );
+  // console.log(" arrayToUpdate-AFTER  ++++++++++++++++", arrayToUpdate);
+
+  console.log("######################################## reset vote AFTER", product)
   return product; // fais remonter le product(en argument)à la fonction resetVote  qui est invoquée  dans la fonction updateVote
 }
 
 function incrementVote(product, userId, like) {
-  // console.log("ancien like", product.likes);
+
   const usersLiked = product.usersLiked; //const { usersLiked, usersDisliked } = product;
   const usersDisliked = product.usersDisliked;
-  // if (usersLiked.includes(userId)) return;//si l'utilisateur liké inclus  déjà le like de l'utilisateur stoppe
-  // usersLiked.push(userId);
-  // product.likes++;
-  // console.log("like sur product  +++++++", product.likes);//les objets sont assignés par références tandis que les primitives sont assignées par valeurs
-  // console.log("product after  +++++++++ ", product);
 
-  // si like === 1 (? pour oui) on push dans usersLiked  sinon on push dans usersDisliked(: pour sinon)
   const votersArray = like === 1 ? usersLiked : usersDisliked; // conditional ternary operator
   console.log("update votersArray", votersArray);
   if (votersArray.includes(userId)) return product; //si l'utilisateur(voteur) liké inclus déjà le like de l'utilisateur stoppe et renvoie product
-  votersArray.push(userId);
-
-  let voteToUpdate = like === 1 ? ++product.likes : ++product.dislikes;
-  voteToUpdate++;
+  votersArray.push(userId);//push le userId dans le array
+  // const goodIncrement = ++likes  // const badIncrement == likes++ : mauvais car like assigné avant incrémentation //
+  //assignation par reference VS assignation par valeur // risque de ciblé le likes à la place du product.likes
   //like === 1 ? ++product.likes : ++product.dislikes;
-  console.log(" voteToUpdate !!!!!!!!!!!!", voteToUpdate);
+
+  // let voteToUpdate
+  // if (like === 1){
+  //   voteToUpdate = product.likes
+  //   product.likes = ++voteToUpdate
+  // } else {//(dislike === 1)
+  //   voteToUpdate = product.dislikes
+  //   product.dislikes = ++voteToUpdate
+  // }
+
+   //like === 1 ? ++product.likes : ++product.dislikes;  //version simplifié voteUpdate qui n'a pas besoin d'etre déclaré en variable mais pratique pour console.log
+
+   let voteToUpdate = like === 1 ? ++product.likes : ++product.dislikes;// on a créé une variable qui est égale à product.likes ou ++product.dislikes. on juste créé un voteToUpdate qui est égal à un chiffre //il faut  qu'on l'update sur le produit lui même
+   voteToUpdate++;
+
+
+   console.log(" voteToUpdate !!!!!!!!!!!!", voteToUpdate);
   console.log(" product apres vote !!!!!!!!!!!", product);
   return product; // attention à bien retourner product
 }
