@@ -56,22 +56,7 @@ function getSauceById(req, res) {
 function deleteSauceById(req, res) {
   const id = req.params.id;
   Product.findByIdAndDelete(id) //ordonne la suppression de l'id de l'image vers MongoDB
-
-    //Renvoie "image deja supprimée" ou product s'il ne la pas dans le backend //supprime image localement mais s'il ne l'a pas indique-le
-    //.then(() => res.send({ message: "produit supprimé" }))
-    //récupère product dans la DB:
-    //.then((product) => res.send({ message: product })) //envoie message de succès au site web(client)
     .then((product) => sendClientResponse(product, res))
-    // .then((product) => {
-    //   if (product == null) {
-    //     console.log("nothing to update");
-    //     return res
-    //       .status(404)
-    //       .send({ message: "object not found in database" });
-    //   }
-    //   console.log("Update le Body by id! :", product);
-    //   res.status(200).send({ message: "successfully updated" });
-    // })
     .then((productitem) => deleteImage(productitem))
     .then((res) => console.log("file deleted", res))
     .catch((err) => res.status(500).send({ message: err }));
@@ -85,54 +70,36 @@ function deleteImage(product) {
   //si null tu t'arretes
   if (product == null) return "n'existe pas dans la base de donnée"; //monggose ne renvoie pas d'erreur s'il ne trouve rien dans la base de donnée. à nous de créer cette condition
   const imageUrl = product.imageUrl; //recupère l'imageUrl de product
-  const fileToDelete = imageUrl.split("/").pop(); //ne garde que la derniere partie
+  const fileToDelete = imageUrl.split("/").pop();
   return unlink(`images/${fileToDelete}`); //  unlink ne retourne rien mais pour bonne pratique placer un return à la fin d'une promesse //ici le unlink est déjà un promesse de part la methode asssocié à "fs/promises"
-  // .then((res) => console.log ("file deleted",res))  //renvoyer ds la function  modifSauce en-dessous de deleteImage
-  // //return unlink("images/" + fileToDelete.then(() => product);
-  // .catch((err) => console.error("!!!!!!!!!!!!!!!!!!!","problem deleting file!!!!!", err))
 }
 
 // Fabrique l'URL d'une image à partir de son nom de fichier
 function makeImageUrl(req, fileName) {
   return req.protocol + "://" + req.get("host") + "/images/" + fileName;
 }
-// Modifier  le contenu de la sauce :
 
+// Modifier  le contenu de la sauce :
 function modifySauceById(req, res) {
   const id = req.params.id; // const {params: {id}} = req //autre syntaxe +courte
   const body = req.body; // syntaxe courte : const {body, file} = req
   const file = req.file;
   console.log({ body, id, file }); //affiche le nouveau body que j'ai moi meme modifié
-  //on parse la chaine de caractere pour en faire un objet et recuperer
-
-  //const payload = makePayload()//invoque la fonction makePayload
   //s'il ya une image hasNewImage est vrai (boolean)
   const hasNewImage = req.file != null; // != et non !== pour que null soit reconnu comme étant undefined
   const payload = makePayload(hasNewImage, req);
   //on definit un payload et s il n y a pas de nouvelle image il sera égal à req.body
-  //let payload;
-  // if (!hasNewImage) return body
   // console.log("hasNewImage", hasNewImage);
+
   //va chercher le product by id à partir du param url qu'il faut ensuite modifier en base de donnée(body tranformé en payload)
   Product.findByIdAndUpdate(id, payload) //payload en param pour le body qu'on va transformer et lui passer s'il ya une nouvelle image
     //envoie le produit à la fonction sendClientResponse
-    .then((resdatabody) => sendClientResponse(resdatabody, res)) // si le sendClientResponse n'est pas nul on lui enchaine la promesse suivante deleteImage:
-    // .then((resdatabody) => {
-    //   if (resdatabody == null) {
-    //     console.log("nothing to update");
-    //     res.status(404).send({ message: "object not found in database" });
-    //   }
-    //   console.log("Update le Body by id! :", resdatabody);
-    //   res.status(200).send({ message: "successfully uptated" });
-    // })
-    //s'il trouve le produit il l'enlève du serveur du dossier back dans images
-    .then((product) => deleteImage(product))
+    .then((resdatabody) => sendClientResponse(resdatabody, res)) //enchaine la promesse suivante deleteImage si sendClient non nul:
+    .then((product) => deleteImage(product)) //s'il trouve le produit il l'enlève du serveur du dossier back dans images
     .then((res) => console.log("file deleted", res))
-    //return unlink("images/" + fileToDelete.then(() => product);
     .catch((err) =>
       console.error("!!!!!!!!!!!!!!!!!!!", "problem deleting file!!!!!", err)
     );
-  // .catch((err) => console.error(" problème sur le update!", err));
 }
 
 // fabrique nouveau payload si nouvelle image en fonction de la requète de modifysauceById
@@ -141,15 +108,14 @@ function makePayload(hasNewImage, req) {
   if (!hasNewImage) return req.body; //pas de vouvelle image la fonction stoppe!
   console.log("hasNewImage", hasNewImage);
   const payload = JSON.parse(req.body.sauce);
-  payload.imageUrl = makeImageUrl(req, req.file.fileName); //on passe un objet puis une propriété de l'objet que l'on vient de lui passer// revient à req.protocol + "://" + req.get("host") + "/images/" + fileName;
-  // console.log("#################");
+  payload.imageUrl = makeImageUrl(req, req.file.fileName); //on passe un objet puis une propriété de l'objet que l'on vient de lui passer// revient à passer req.protocol + "://" + req.get("host") + "/images/" + fileName;
   console.log("et voici le payload", payload);
   console.log("nouvelle image à gérer");
   console.log("voici le body:", req.body.sauce);
   return payload;
 }
 
-// donne la réponse au client et informe s'il ya produit identique ou non à updater
+// Donne la réponse au client et informe s'il ya produit identique ou non à updater
 function sendClientResponse(product, res) {
   //product représente pour resdatabody
   //product represente pour la reponse de la bdd renvoyée par mongo
@@ -200,11 +166,10 @@ function createSauce(req, res) {
   product
     .save() // methode pour sauvegarder le body
     .then((message) => res.status(201).send({ message })) //attention au conflit (internal servor error 500) pour cela on a nommé message à la place de res qui represente le param de la fonction createSauce et non la reponse(message) de product.
-    //.catch(console.error);
     .catch((err) => res.status(500).send(err));
 }
 
-// Notifier
+// Notifier Like ou Dislike:
 
 function likeSauce(req, res) {
   const id = req.params.id; // const {params: {id}} = req
@@ -212,7 +177,6 @@ function likeSauce(req, res) {
   const userId = req.body.userId;
   //methode Array.includes !
   //si l'array ne contient pas le like alors le like n'est ni égal à 0, 1 ni -1 et on stoppe la fonction
-  // methode qui facilit grandement et évite l'accumulation de if et else
   console.log("fonction likeSauce invoquée *********************");
   //si le like different de -1, 0 ou 1 renvoie message d'erreur
   if (![-1, 0, 1].includes(like))
@@ -230,140 +194,51 @@ function likeSauce(req, res) {
     .catch((err) => res.status(500).send(err));
 }
 
-//necessite res en argument pour renvoyer une reponse en cas d'erreur sur resetVote
-//function updateLike(product, like, userId) {
+// Met à jour le vote :
+//nécessite d'avoir la reponse pour renvoyer une erreur:
 function updateVote(product, like, userId, res) {
-  //nécessite d'avoir la reponse pour renvoyer une erreur:
-
-  //if (like === 1 || like === -1) return incrementVote(product, userId, like);//s'arrete direct avec le return et passe le relai à incrementVote si 1 ou -1 donc empeche de continuer pour avoir le return sur product.save
-
   //on place un return devant incrementVote car on a besoin de passer quelque chose dans le .then d'après dans likeSauce
-  if (like === 1 || like === -1) return incrementVote(product, userId, like); //!!!!!!!!!!!!!!!!!!!!! attention  enlever return sur incrementVote si appel de fonction resetVote avant le return product.save() sinon ne continue pas !!!!!!!!!!!!
-  //if (like === 1 || like === -1) incrementLike(product, userId);
-  // if (like === 1) incrementLike(product, userId);
-  // if (like === -1) incrementLike(product, userId);
-  //if (like === -1) decrementLike(product, userId);
-  // return resetLike(product, userId, res);
-
-  //le return devant resetVote permet de renoyer l'erreur mais empeche de lire et de retourner le product.save
-
-  //if (like === 0) resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur
-  if (like === 0) return resetVote(product, userId, res); ///nécessite d'avoir la reponse pour renvoyer une erreur//  resetVote doit aussi faire remonter le product donc on place un return à la fin de la fonction resetVote. Elle renvoie le product à updateVote qui est invoquée dans likeSauce// on peut noter simplement return resetVote car le 1 et le -1 sont déjà utilisé ds la condition précédente.// le zero est déja préprogrammé au clic dessus (dans le front) mais il faut transmettre l'information et le message d'erreur
-
-  //product.save(); //sauvegarde le produit
-
-  // return product.save(); enlève ce return product.save() pour le placer dans la chaine de promises à la suite du .then qui appelle updateVote
-  //!!!! obligé d'avoir une valeur de retour à passer à updateVote sinon updateVote ne passera rien au .then d'après
+  if (like === 1 || like === -1) return incrementVote(product, userId, like);
+  if (like === 0) return resetVote(product, userId, res); //nécessite d'avoir la reponse pour renvoyer une erreur
 }
 
-//le resetVote nécessite d'avoir la reponse pour renvoyer une erreur en cas de conflit si [usersLiked, usersDisliked] ont le même userId donc on passe res en argument:
+// initialise le vote de l'utilisateur à zero :
 function resetVote(product, userId, res) {
-  console.log("reset vote BEFORE ###################################", product)
+  console.log("reset vote BEFORE ###################################", product);
   const usersLiked = product.usersLiked; //const { usersLiked, usersDisliked } = product;
   const usersDisliked = product.usersDisliked;
-  // CAS D'ERREUR :
-  //const arrayToUpdate = usersLiked.includes(userId) ? usersLiked : usersDisliked //si oui on update usersliked sinon usersDisliked// risqué si pour une raison inconnue, le userId est soit dans aucun des deux, soit dans les deux
-  // Méthode Array.every() vérifie toutes les valeurs dans un array: on applique la fonction à chaque élément de l'array:
-  // si pour chacun des arrays de usersLiked et usersDisliked l'array inclus le userId c'est qu'on a une erreur car on ne peut pas avoir les deux en même temps
-  //Promise.reject force à envoyer l'erreur dans le catch (err 500 interne server) du Product.findById à la fin du chainage de promesse dans la fonction likeSauce
+
   if ([usersLiked, usersDisliked].every((array) => array.includes(userId)))
     return Promise.reject(
       "Conflicting vote, there is a like and dislike for the same user !!!!!!!"
     );
-  // return res.satus(500).send({
-  //   message: "conflicting vote, impossible to like ans dislike together" });
-  // Promise.reject force à aller dans le catch // attentio à specifier return devant le resetVote dans la fonction updatVote!
-
-  // throw new Error("!!!!!!! Conflicting vote, there is a like and dislike for the same user !!!!!!!")
-
-  // Méthode : array.some verifie si certaines des valeurs du array répondent à une condition
-  // si un seul ne passe pas la validation alors message d'erreur car ! devant represente la negation
-  //si pour chacun des arrays de usersLiked et usersDisliked, on (a aucun) on n'a pas au moins un userId dans chacun des tableaux alors erreur car vote vide
-
   if (![usersLiked, usersDisliked].some((array) => array.includes(userId)))
     return Promise.reject("Conflicting vote, because vote of user empty"); // et donc automatiquement la préprogrammation du site fait que s'il ya ce conflit, il me l'efface de la bdd sur Mongo
-
-  // updater le like ou le disLike
-  //dans mongoDb provoquer conflit en intégrant le même userId dans usersLiked et usersDisliked affiche 500(internal server) et ERROR undefined dans console sans message particulier donc on utilise Promise.reject
-  // On arrive ensuite à cette condition propre où on a bien l'un des deux arrays qui contient le userId:
-  //ici products.like est un nombre donc il n'est pas passé par référence mais par valeur et ne sera pas updaté sur le product.
-
-//   let voteToUpdate = usersLiked.includes(userId)// attention let pas const ! 
-//     ? product.likes
-//     : product.dislikes;
-//   voteToUpdate--;// const goodIncrement = ++likes  // const badIncrement == likes++ : mauvais car like assigné avant incrémentation //
-//  usersLiked.includes(userId)
-//     ? (product.likes = voteToUpdate)
-//     : (product.dislike = voteToUpdate);
-
-  // usersLiked.includes(userId)// attention let pas const !  //version simplifié voteUpdate
-  //   ? --product.likes
-  //   : --product.dislikes;
-
- 
-  //console.log("\\\\\\\\\\\\\\ VotetoUpdate  ////////", voteToUpdate);
-  //on sait maintenant que le userId est soit dans l'un soit dans l'autre des tableaux usersLiked ou usersDisliked
-  //si je fais des modifications sur arrayToUpdate cela me mofifiera bien le product lui même car on est bien sur une assignation par référence
-  //on va donc eviter de travailler sur des variables mais travailler directement sur l'objet lui même: donc :
-//nouvelle version : pour être sur qu'on touche l'objet lui même :
-  if (usersLiked.includes(userId)){
-    --product.likes
-   product.usersLiked =  product.usersLiked.filter((id) => id !== userId);
+  if (usersLiked.includes(userId)) {
+    --product.likes;
+    product.usersLiked = product.usersLiked.filter((id) => id !== userId);
   } else {
-    --product.dislikes
-    product.usersDisliked =  product.usersDisliked.filter((id) => id !== userId);
+    --product.dislikes;
+    product.usersDisliked = product.usersDisliked.filter((id) => id !== userId);
   }
-//ancienne version avec variable qui ne permet pas d'assigner correctement la nouvelle valeur qu'on veut donner à product
-  // let arrayToUpdate = usersLiked.includes(userId) //let et non const pour pouvoir reassigner la variable!
-  //   ? usersLiked
-  //   : usersDisliked;
-
-  // Méthode filter (): renvoie un array ou chaque element aura passer le test pour savoir s'il est différent de userId
-  //filtre et récupère uniquement tout les id qui sont differents du userId
-  // const arrayWithoutUser = arrayToUpdate.filter((id) => id !== userId); //renvoie un nouvel arrayWithoutUser sans changer l'arrayToUpdate donc on va le réassigner:
-
-  // console.log("------------  arrayToUpdate-BEFORE", arrayToUpdate);
-  // console.log("------------ nouveau arrayWithoutUser-BEFORE", arrayWithoutUser);
-  // arrayToUpdate = arrayWithoutUser;
-  // console.log(
-  //   "nouveau arrayWithoutUser-AFTER  +++++++++++++",
-  //   arrayWithoutUser
-  // );
-  // console.log(" arrayToUpdate-AFTER  ++++++++++++++++", arrayToUpdate);
-
-  console.log("######################################## reset vote AFTER", product)
+  console.log(
+    "######################################## reset vote AFTER",
+    product
+  );
   return product; // fais remonter le product(en argument)à la fonction resetVote  qui est invoquée  dans la fonction updateVote
 }
 
 function incrementVote(product, userId, like) {
-
   const usersLiked = product.usersLiked; //const { usersLiked, usersDisliked } = product;
   const usersDisliked = product.usersDisliked;
-
   const votersArray = like === 1 ? usersLiked : usersDisliked; // conditional ternary operator
   console.log("update votersArray", votersArray);
   if (votersArray.includes(userId)) return product; //si l'utilisateur(voteur) liké inclus déjà le like de l'utilisateur stoppe et renvoie product
-  votersArray.push(userId);//push le userId dans le array
-  // const goodIncrement = ++likes  // const badIncrement == likes++ : mauvais car like assigné avant incrémentation //
-  //assignation par reference VS assignation par valeur // risque de ciblé le likes à la place du product.likes
-  //like === 1 ? ++product.likes : ++product.dislikes;
+  votersArray.push(userId); //push le userId dans le array
+  let voteToUpdate = like === 1 ? ++product.likes : ++product.dislikes;
+  voteToUpdate++;
 
-  // let voteToUpdate
-  // if (like === 1){
-  //   voteToUpdate = product.likes
-  //   product.likes = ++voteToUpdate
-  // } else {//(dislike === 1)
-  //   voteToUpdate = product.dislikes
-  //   product.dislikes = ++voteToUpdate
-  // }
-
-   //like === 1 ? ++product.likes : ++product.dislikes;  //version simplifié voteUpdate qui n'a pas besoin d'etre déclaré en variable mais pratique pour console.log
-
-   let voteToUpdate = like === 1 ? ++product.likes : ++product.dislikes;// on a créé une variable qui est égale à product.likes ou ++product.dislikes. on juste créé un voteToUpdate qui est égal à un chiffre //il faut  qu'on l'update sur le produit lui même
-   voteToUpdate++;
-
-
-   console.log(" voteToUpdate !!!!!!!!!!!!", voteToUpdate);
+  console.log(" voteToUpdate !!!!!!!!!!!!", voteToUpdate);
   console.log(" product apres vote !!!!!!!!!!!", product);
   return product; // attention à bien retourner product
 }
