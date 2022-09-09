@@ -1,90 +1,68 @@
-// const renvoie un objet donc mettre accolade ou
-
-const { User } = require("../mongo"); // ../ car  fichier users dans controllers
-const bcrypt = require("bcrypt"); // librairie de hashing
+// l'objet User (entre accolade) requiert la page fichier mongo
+const { User } = require("../mongo");
+// Invoque la Bibliothèque de hachage de mot de passe
+const bcrypt = require("bcrypt");
+// Invoque la Bibliothèque qui permet l'échange sécurisé de jetons(tokens d'authentification)
 const jwt = require("jsonwebtoken");
 
-// //promess async await //ici res est la réponse du serveur
-//  // a partir du moment ou on invoque une fonction ce n'est plus une fonction mais sa valeur de retour
+//  Créer un nouvel utilisateur (user) avec son identifiant (Hachage du mot de passe de l'utilisateur, ajout de l'utilisateur à la base de données):
 async function createUser(req, res) {
-  //console.log("res", res.send);
-  try {
-    const { email, password } = req.body; //autre syntaxe plus elegante pour prendre req.body des 2 parametres
-    const hashedPassword = await hashPassword(password);
-    console.log("password", password);
-    console.log("hashedPassword:", hashedPassword); //le hash ne va que dans un sens
-    const user = new User({ email: email, password: hashedPassword });
-    //le user reçoit la réponse nommmé res de la base de donnée et le res représente la réponse du serveur donc il y a conflit//pas de res dans le then!
-    await user.save();
-    res.status(201).send({ message: "Utilisateur enregistré ! " });
-    //
-  } catch (err) {
-    res.status(409).send({ message: "Utilisateur non enregistré : " + err });
-  } //problème côté user
-}
-
-function hashPassword(password) {
-  //le hashPassword renvoie une promesse avec return
-  const saltRounds = 10;
-  return bcrypt.hash(password, saltRounds); //au lieu de comparer les mots de passe il va comparer les hashs
-}
-
-// async souvent accompagné du try catch, on va rajouter des cas d'erreur possible,(trouve pas de user ou probleme de connexion)
-async function logUser(req, res) {
-  //la fonction est invoquée avec express (app.post)
   try {
     const email = req.body.email;
     const password = req.body.password;
-    //comparer email enregistré dans bdd et email inscrit dans input:
-    //User.findOne({ email: email }).then(console.log);// le findOne est une promesse qui doit être résolue avec un await // v1
+    //attend la valeur retournée par la fonction hashedPassword qu'on a attribuée à hashPassword :
+    const hashedPassword = await hashPassword(password);
+    // On stocke dans user le nouvel objet User créé qui a une propriété email et password (MongoDB va attribuer à l'objet un _id):
+    const user = new User({ email: email, password: hashedPassword });
+    //attend d'avoir sauvegardé le user avant d'envoyer la réponse:
+    await user.save();
+    res.status(201).send({ message: "Utilisateur enregistré ! " });
+  } catch (err) {
+    res.status(409).send({ message: "Utilisateur non enregistré : " + err });
+  }
+}
+
+// Transforme le mot de passe en chaine de caractère pour le rendre unique :
+function hashPassword(password) {
+  // Facteur de coût (2^10)pour augmenter le nombre de tours de hachage(cycle de calcul pour obtenir le hachage final) :
+  const saltRounds = 10;
+  // Prend le mot de passe suivi d'une valeure salée ajoutée au mdp et hash l'ensemble :
+  return bcrypt.hash(password, saltRounds);
+}
+
+// Connecter un client déjà connu (Vérification des informations d'identification de l'utilisateur, renvoie l _id de l'utilisateur depuis la base de données et un token web JSON signé (contenant également l'_id de l'utilisateur).
+async function logUser(req, res) {
+  try {
+    const email = req.body.email;
+    const password = req.body.password;
+    // attend de trouver l'email du User enregistré dans la bdd qui correspond à l'email inscrit dans le input et attribue sa valeur à userInputMatchBdd:
     const userInputMatchBdd = await User.findOne({ email: email });
-    console.log("userInputMatchBdd", userInputMatchBdd);
-    //compare le mdp au hash:
+    // attend de comparer le mdp inscrit dans le input avec le password hashé enregistré dans la bdd et attribue sa valeur à passwordMatchHash:
     const passwordMatchHash = await bcrypt.compare(
       password,
       userInputMatchBdd.password
     );
+    // si mdp du input different du mdp de bdd, il est incorrect:
     if (!passwordMatchHash) {
-      //si different, si il n'est pas bon
       res.status(403).send({ message: "Mot de passe incorrect" });
     }
-    const token = createToken(email); // l'email en param match avec bdd
+    //On stocke dans token la valeur de retour de la fonction createToken à laquelle on a passé l'email en argument:  :
+    const token = createToken(email);
+    // si le mdp du input correspond au mdp de la bdd, renvoie un status 200 et passe la réponse avec l'id de l'utilisateur et le jeton d'authentification:
     if (passwordMatchHash) {
-      //si match envoie status 200 if(passwordMatchHash) peut
-      // res.status(200).send({ message: "Connexion réussie" });v1
-      res.status(200).send({ userId: userInputMatchBdd._id, token: token }); //v1 sans ?devant id
-     // res.status(200).send({ userId: userInputMatchBdd._id, token: token }); //v2 avec ? devant id
+      res.status(200).send({ userId: userInputMatchBdd._id, token: token });
     }
-    console.log("userInputMatchBdd", userInputMatchBdd);
-    console.log("passwordMatchHash", passwordMatchHash);
   } catch (err) {
-    res.status(500).send({ message: "Erreur interne" }); //error servor et pas coté user
+    res.status(500).send({ message: "Erreur interne" }); //error côté server et pas coté user
   }
 }
 
+// Créer un jeton d'authentification à partir de l'email de l'utilisateur en paramètre:
 function createToken(email) {
+  // attribue à jwtPassword le mdp du JWT caché dans le fichier .env
   const jwtPassword = process.env.JWT_PASSWORD;
-  // const token = jwt.sign({ email: email }, "pelican", { expiresIn: "24h" });//il ne suffit pas de retourner le payload décodé, il faut aussi le vérifier sinon on peut changer le mot de passe et obtenir quand même l'email, iat et exp
- //console.log(jwtPassword);
- // const token = jwt.verify({ email: email }, jwtPassword, { expiresIn: "24h" }); //si mot de passe invalide, nous renvoie : JsonWebTokenError: invalid signature
-
-  //  TESTER VOIR comment réagit si le token a expiré : 1000ms
-  // const token = jwt.verify({ email: email }, jwtPassword, { expiresIn: "1000ms" });//si mot de passe invalide, nous renvoie : JsonWebTokenError: invalid signature
-  //pas deconsole.log pour le token dans cette fonction sinon erreur serveur 500
-  //return token;
-return jwt.sign({ email: email }, jwtPassword, { expiresIn: "24h" });
+  // retourne un objet avec les données de l'email à signer avec le mdp jwtPassword, et l'option qui indique la durée de validité du jwt:
+  return jwt.sign({ email: email }, jwtPassword, { expiresIn: "24h" });
 }
 
-// function createToken refactoré:
-
-// function createToken(email) {
-//    return  jwt.sign({email : email}, "pelican", {expiresIn:"24h"})
-//  }
-
-//----------attention! Supprime tt les users ------------------------------------------------
-//pour effacer tout les users: sinon depuis MongoAtlas dans users DROP
-//User.deleteMany({}).then(())=>console.log("all removed")
-//---------------------------------------------------------
-
-//index a besoin du creatUser donc exporter module:
 module.exports = { createUser, logUser };

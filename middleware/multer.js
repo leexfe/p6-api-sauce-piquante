@@ -1,6 +1,7 @@
+// Invoque la librairie qui permet de gérer les fichiers entrants dans les requêtes pour pouvoir lire les données en Form/Data
 const multer = require("multer");
 
-// Permet d'envoyer à la bonne destination le fichier image au bon format pou
+// Permet de configurer la destination et le nom du fichier image pour les fichiers entrants:
 const storage = multer.diskStorage({
   destination: "images/",
   filename: function (req, file, callback) {
@@ -8,18 +9,17 @@ const storage = multer.diskStorage({
   },
 });
 
-  // Recupere la requete pour coller const fileName ds la requete
+// Fabrique la constante fileName pour le retourner au middleware avant que le controller puisse l'utiliser :
 function makeFilename(req, file) {
-
   console.log("req, file:", file);
-  const fileName = `${Date.now()}-${file.originalname}`.replace(/\s/g, "-"); //Date.now pour eviter les doublons pour les noms envoyés enregistrés// originalname pour preciser jpeg ou tiff ou png...
-  //replace permet de supprimer les espaces(voir Whitespace) et les remplace en 2 eme param avec un tiret
-  //req.fileName = fileName
+  //Date.now évite les doublons pour les noms de fichiers entrants - originalname précise jpeg, tiff, png - replace supprime les espaces et remplace par un tiret
+  const fileName = `${Date.now()}-${file.originalname}`.replace(/\s/g, "-"); 
   file.fileName = fileName;
-  return fileName; // on retourne un nom de fichier qui transforme la requète avant que le controller  puisse l'utiliser pour y générer une réponse
+  return fileName;
 }
 
+// Permet d'uploader une image sur le serveur à l'aide du storage configuré:
 const upload = multer({ storage: storage }).single("image");
-//const upload = multer({ storage }).single("image"); qd clé et valeur ont le même nom on peut garder qu'un seul nommage
 
-  module.exports =   { upload };
+
+module.exports = { upload };
